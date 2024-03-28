@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, Integer, String, Float, LargeBinary, Enum
+from sqlalchemy import Column, Integer, String, Float, Enum
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()

@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -29,4 +30,5 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, docs_url='/')
 app.include_router(router)
+os.makedirs("media/images", exist_ok=True)
 app.mount("/media/images", StaticFiles(directory="media/images"), name="media")

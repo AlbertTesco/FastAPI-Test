@@ -3,14 +3,17 @@ import os
 from typing import List
 
 import aiofiles
+import sqlalchemy
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.database import async_session, get_db
+from db.database import get_db
+from logger_config import setup_logger
 from models.book import BookORM
 from shemas.book import SBookBase, SBookFilters
 
 router = APIRouter()
+logger = setup_logger()
 
 
 @router.post("/add_books")
@@ -36,7 +39,7 @@ async def add_books(books: List[SBookBase], db: AsyncSession = Depends(get_db)):
                 photo_base64 = photo_base64.split(",")[-1]
                 photo_content = base64.b64decode(photo_base64)
             except Exception as e:
-                print(f"Ошибка при декодировании изображения для книги {book_data.name}: {e}")
+                logger.error(f"Ошибка при декодировании изображения для книги {book_data.name}: {e}")
                 continue
 
             new_book = BookORM(
@@ -58,15 +61,24 @@ async def add_books(books: List[SBookBase], db: AsyncSession = Depends(get_db)):
                 async with aiofiles.open(filename, 'wb') as f:
                     await f.write(photo_content)
             except Exception as e:
-                print(f"Ошибка при сохранении файла для книги {book_data.name}: {e}")
+                logger.error(f"Ошибка при сохранении файла для книги {book_data.name}: {e}")
 
             new_book.photo = '/' + filename
 
     try:
         await db.commit()
+    except sqlalchemy.exc.OperationalError as e:
+        logger.error(f"Ошибка сети при коммите сессии: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка сети при сохранении книги")
+    except sqlalchemy.exc.IntegrityError as e:
+        logger.error(f"Ошибка целостности данных при коммите сессии: {e}")
+        raise HTTPException(status_code=400, detail="Ошибка целостности данных при сохранении книги")
+    except sqlalchemy.exc.ProgrammingError as e:
+        logger.error(f"Ошибка синтаксиса SQL при коммите сессии: {e}")
+        raise HTTPException(status_code=400, detail="Ошибка синтаксиса SQL при сохранении книги")
     except Exception as e:
-        print(f"Ошибка при коммите сессии: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка при сохранении книги")
+        logger.error(f"Неизвестная ошибка при коммите сессии: {e}")
+        raise HTTPException(status_code=500, detail="Неизвестная ошибка при сохранении книги")
 
     return {"success": True}
 
